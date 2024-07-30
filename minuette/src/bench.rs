@@ -75,7 +75,7 @@ pub fn run_bench() {
     let mut total_time = Duration::ZERO;
     for fen in BENCH_POSITIONS {
         let init_pos = fen.parse().expect("failed to parse fen");
-        let limits = SearchLimits::PerMove { depth: 4 };
+        let limits = SearchLimits::PerMove { depth: 5 };
 
         let mut nodes = 0;
         let mut time = Duration::ZERO;
