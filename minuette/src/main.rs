@@ -1,11 +1,12 @@
 use std::io::prelude::*;
+use std::time::Duration;
 
-use cozy_chess::Board;
+use cozy_chess::{Board, Color};
 use cozy_chess::util::{parse_uci_move, display_uci_move};
 
 mod engine;
 
-use engine::{Engine, Clock};
+use engine::{Engine, SearchLimits};
 
 fn main() {
     let mut init_pos = Board::startpos();
@@ -52,18 +53,37 @@ fn main() {
                 }
             }
             "go" => {
-                let clock = Clock {
-                    wtime: get_clock_field(&tokens, "wtime").unwrap_or_default(),
-                    btime: get_clock_field(&tokens, "btime").unwrap_or_default(),
-                    winc: get_clock_field(&tokens, "winc").unwrap_or_default(),
-                    binc: get_clock_field(&tokens, "binc").unwrap_or_default(),
+                let wtime = get_clock_field(&tokens, "wtime").unwrap_or_default();
+                let btime = get_clock_field(&tokens, "btime").unwrap_or_default();
+                let winc = get_clock_field(&tokens, "winc").unwrap_or_default();
+                let binc = get_clock_field(&tokens, "binc").unwrap_or_default();
+
+                let (time, inc) = match current_pos.side_to_move() {
+                    Color::White => (wtime, winc),
+                    Color::Black => (btime, binc),
                 };
 
-                let info = engine.think(&init_pos, &moves_played, clock, &mut |_info| {
-                    
+                let limits = SearchLimits {
+                    clock: Duration::from_millis(time as u64),
+                    increment: Duration::from_millis(inc as u64),
+                };
+
+                let mut best_move = None;
+                engine.think(&init_pos, &moves_played, limits, &mut |info| {
+                    best_move = Some(info.best_move);
+                    println!(
+                        "info depth {} nodes {} score cp {} time {} nps {} pv {}",
+                        info.depth,
+                        info.nodes,
+                        info.eval,
+                        info.time.as_millis(),
+                        (info.nodes as f32 / info.time.as_secs_f32()) as u64,
+                        display_uci_move(&current_pos, info.best_move),
+                    );
                 });
 
-                println!("bestmove {}", display_uci_move(&current_pos, info.best_move));
+                let best_move = best_move.expect("missing best move?");
+                println!("bestmove {}", display_uci_move(&current_pos, best_move));
             }
             "quit" => {
                 break;
