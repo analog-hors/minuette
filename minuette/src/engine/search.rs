@@ -11,9 +11,14 @@ const CHECKMATE: i16 = 30_000;
 const INFINITY: i16 = 31_000;
 
 #[derive(Debug, Clone, Copy)]
-pub struct SearchLimits {
-    pub clock: Duration,
-    pub increment: Duration,
+pub enum SearchLimits {
+    PerGame {
+        clock: Duration,
+        increment: Duration,
+    },
+    PerMove {
+        depth: u8,
+    },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -29,16 +34,31 @@ pub struct Search {
     search_start: Instant,
     soft_limit: Duration,
     hard_limit: Duration,
+    max_depth: u8,
     best_move: Option<Move>,
     nodes: u64,
 }
 
 impl Search {
     pub fn new(limits: SearchLimits) -> Self {
+        let mut soft_limit = Duration::MAX;
+        let mut hard_limit = Duration::MAX;
+        let mut max_depth = u8::MAX;
+        match limits {
+            SearchLimits::PerGame { clock, .. } => {
+                soft_limit = clock / 40;
+                hard_limit = clock / 4;
+            }
+            SearchLimits::PerMove { depth } => {
+                max_depth = depth;
+            }
+        }
+
         Self {
             search_start: Instant::now(),
-            soft_limit: limits.clock / 40,
-            hard_limit: limits.clock / 4,
+            soft_limit,
+            hard_limit,
+            max_depth,
             best_move: None,
             nodes: 0,
         }
@@ -46,7 +66,7 @@ impl Search {
 
     pub fn start(mut self, init_pos: &Board, moves_played: &[Move], on_iter: &mut dyn FnMut(SearchInfo)) {
         let mut board = BoardStack::new(init_pos, moves_played);
-        for target_depth in 1.. {
+        for target_depth in 1..=self.max_depth {
             let Some(eval) = self.negamax(&mut board, target_depth, 0) else {
                 break;
             };

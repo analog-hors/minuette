@@ -5,10 +5,16 @@ use cozy_chess::{Board, Color};
 use cozy_chess::util::{parse_uci_move, display_uci_move};
 
 mod engine;
+mod bench;
 
 use engine::{Engine, SearchLimits};
 
 fn main() {
+    if std::env::args().nth(1).as_deref() == Some("bench") {
+        bench::run_bench();
+        return;
+    }
+
     let mut init_pos = Board::startpos();
     let mut current_pos = Board::startpos();
     let mut moves_played = Vec::new();
@@ -63,7 +69,7 @@ fn main() {
                     Color::Black => (btime, binc),
                 };
 
-                let limits = SearchLimits {
+                let limits = SearchLimits::PerGame {
                     clock: Duration::from_millis(time as u64),
                     increment: Duration::from_millis(inc as u64),
                 };
