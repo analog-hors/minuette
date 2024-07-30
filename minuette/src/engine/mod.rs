@@ -1,4 +1,5 @@
 mod board_stack;
+mod movelist;
 mod search;
 mod interface;
 

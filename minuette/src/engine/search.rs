@@ -1,11 +1,9 @@
 use std::time::{Duration, Instant};
 
-use arrayvec::ArrayVec;
 use cozy_chess::{Board, Move, Color, Piece, GameStatus};
 
 use super::board_stack::BoardStack;
-
-type MoveList = ArrayVec<Move, 218>;
+use super::movelist::get_ordered_moves;
 
 const CHECKMATE: i16 = 30_000;
 const INFINITY: i16 = 31_000;
@@ -108,15 +106,9 @@ impl Search {
             return Some(0);
         }
 
-        let mut movelist = MoveList::new();
-        board.get().generate_moves(|packed_moves| {
-            movelist.extend(packed_moves);
-            false
-        });
-    
         let mut best_move = None;
         let mut best_score = -INFINITY;
-        for mv in movelist {
+        for mv in get_ordered_moves(board.get()) {
             board.play_unchecked(mv);
             let child_score = -self.negamax(board, -beta, -alpha, depth - 1, ply + 1)?;
             board.undo();
