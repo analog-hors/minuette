@@ -1,5 +1,6 @@
 mod board_stack;
 mod movelist;
+mod eval;
 mod search;
 mod interface;
 

@@ -1,12 +1,10 @@
 use std::time::{Duration, Instant};
 
-use cozy_chess::{Board, Move, Color, Piece, GameStatus};
+use cozy_chess::{Board, Move, GameStatus};
 
 use super::board_stack::BoardStack;
 use super::movelist::get_ordered_moves;
-
-const CHECKMATE: i16 = 30_000;
-const INFINITY: i16 = 31_000;
+use super::eval::{evaluate, CHECKMATE, INFINITY};
 
 #[derive(Debug, Clone, Copy)]
 pub enum SearchLimits {
@@ -131,19 +129,4 @@ impl Search {
 
         Some(best_score)
     }
-}
-
-fn evaluate(board: &Board) -> i16 {
-    let mut eval = 0;
-    let weights = [100, 300, 300, 500, 900, 0];
-    for piece in Piece::ALL {
-        let white_pieces = board.colored_pieces(Color::White, piece).len();
-        let black_pieces = board.colored_pieces(Color::Black, piece).len();
-        eval += (white_pieces as i16 - black_pieces as i16) * weights[piece as usize];
-    }
-
-    if board.side_to_move() == Color::Black {
-        eval *= -1;
-    }
-    eval
 }
