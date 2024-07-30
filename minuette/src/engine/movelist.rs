@@ -1,15 +1,18 @@
 use arrayvec::ArrayVec;
 use cozy_chess::{Board, Rank, Square, Piece, Move};
 
+use super::tt::TtEntry;
+
 type MoveList = ArrayVec<Move, 218>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum MoveScore {
     Quiet,
     Capture(i32),
+    PvMove,
 }
 
-pub fn get_ordered_moves(board: &Board, qsearch: bool) -> MoveList {
+pub fn get_ordered_moves(board: &Board, qsearch: bool, tt_entry: Option<TtEntry>) -> MoveList {
     let mut movelist = MoveList::new();
     board.generate_moves(|packed_moves| {
         movelist.extend(packed_moves);
@@ -21,6 +24,10 @@ pub fn get_ordered_moves(board: &Board, qsearch: bool) -> MoveList {
     }
 
     let key_fn = |mv| {
+        if Some(mv) == tt_entry.map(|entry| entry.best_move) {
+            return MoveScore::PvMove;
+        }
+
         if let Some(victim) = captured_piece(mv, board) {
             let attacker = board.piece_on(mv.from).expect("missing attacker?");
             return MoveScore::Capture(victim as i32 * 8 - attacker as i32);

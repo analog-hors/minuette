@@ -9,6 +9,8 @@ mod bench;
 
 use engine::{Engine, SearchLimits};
 
+const DEFAULT_HASH: usize = 16;
+
 fn main() {
     if std::env::args().nth(1).as_deref() == Some("bench") {
         bench::run_bench();
@@ -18,7 +20,7 @@ fn main() {
     let mut init_pos = Board::startpos();
     let mut current_pos = Board::startpos();
     let mut moves_played = Vec::new();
-    let mut engine = Engine::new();
+    let mut engine = Engine::new(DEFAULT_HASH * 1024 * 1024);
 
     for line in std::io::stdin().lines() {
         let line = line.expect("failed to read line");
@@ -32,7 +34,19 @@ fn main() {
             "uci" => {
                 println!("id name Minuette 1.0-dev");
                 println!("id author analog hors");
-                println!("uciok")
+                println!("option name Hash type spin default {} min 1 max 1048576", DEFAULT_HASH);
+                println!("uciok");
+            }
+            "setoption" => {
+                let name = get_str_field(&tokens, "name").expect("missing name field");
+                let value = get_str_field(&tokens, "value").expect("missing value field");
+                match name {
+                    "Hash" => {
+                        let value = value.parse::<usize>().expect("failed to parse hash value");
+                        engine.resize_tt(value * 1024 * 1024);
+                    }
+                    _ => {}
+                }
             }
             "ucinewgame" => {
                 engine.reset();
@@ -110,6 +124,11 @@ fn get_fen(tokens: &[&str]) -> Option<String> {
 fn get_moves<'s, 't>(tokens: &'s [&'t str]) -> Option<&'s [&'t str]> {
     let moves_index = tokens.iter().position(|&t| t == "moves")? + 1;
     Some(&tokens[moves_index..])
+}
+
+fn get_str_field<'s, 't>(tokens: &'s [&'t str], field: &str) -> Option<&'t str> {
+    let field_index = tokens.iter().position(|&t| t == field)? + 1;
+    Some(&tokens[field_index])
 }
 
 fn get_clock_field(tokens: &[&str], field: &str) -> Option<u32> {

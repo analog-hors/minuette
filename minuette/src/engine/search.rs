@@ -5,6 +5,7 @@ use cozy_chess::{Board, Move, GameStatus};
 use super::board_stack::BoardStack;
 use super::movelist::get_ordered_moves;
 use super::eval::{evaluate, CHECKMATE, INFINITY};
+use super::tt::{TranspositionTable, TtEntry};
 
 #[derive(Debug, Clone, Copy)]
 pub enum SearchLimits {
@@ -26,7 +27,8 @@ pub struct SearchInfo {
     pub best_move: Move,
 }
 
-pub struct Search {
+pub struct Search<'s> {
+    tt: &'s mut TranspositionTable,
     search_start: Instant,
     soft_limit: Duration,
     hard_limit: Duration,
@@ -35,8 +37,8 @@ pub struct Search {
     nodes: u64,
 }
 
-impl Search {
-    pub fn new(limits: SearchLimits) -> Self {
+impl<'s> Search<'s> {
+    pub fn new(tt: &'s mut TranspositionTable, limits: SearchLimits) -> Self {
         let mut soft_limit = Duration::MAX;
         let mut hard_limit = Duration::MAX;
         let mut max_depth = u16::MAX;
@@ -51,6 +53,7 @@ impl Search {
         }
 
         Self {
+            tt,
             search_start: Instant::now(),
             soft_limit,
             hard_limit,
@@ -107,9 +110,11 @@ impl Search {
             return Some(0);
         }
 
+        let tt_entry = self.tt.load(board.get().hash());
+
         let mut best_move = None;
         let mut best_score = -INFINITY;
-        for mv in get_ordered_moves(board.get(), false) {
+        for mv in get_ordered_moves(board.get(), false, tt_entry) {
             board.play_unchecked(mv);
             let child_score = -self.negamax(board, -beta, -alpha, depth - 1, ply + 1)?;
             board.undo();
@@ -124,12 +129,15 @@ impl Search {
                 break;
             }
         }
-        assert!(best_move.is_some());
 
+        let best_move = best_move.expect("missing best move?");
         if ply == 0 {
-            self.best_move = best_move;
+            self.best_move = Some(best_move);
         }
 
+        self.tt.store(board.get().hash(), TtEntry {
+            best_move,
+        });
         Some(best_score)
     }
 
@@ -144,13 +152,15 @@ impl Search {
             GameStatus::Ongoing => {},
         }
 
+        let tt_entry = self.tt.load(board.get().hash());
+
         let mut best_score = evaluate(board.get());
         alpha = alpha.max(best_score);
         if alpha >= beta {
             return best_score;
         }
 
-        for mv in get_ordered_moves(board.get(), true) {
+        for mv in get_ordered_moves(board.get(), true, tt_entry) {
             board.play_unchecked(mv);
             let child_score = -self.qsearch(board, -beta, -alpha, ply + 1);
             board.undo();

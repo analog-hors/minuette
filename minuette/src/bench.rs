@@ -70,7 +70,7 @@ const BENCH_POSITIONS: &[&str] = &[
 ];
 
 pub fn run_bench() {
-    let mut engine = Engine::new();
+    let mut engine = Engine::new(16 * 1024 * 1024);
     let mut total_nodes = 0;
     let mut total_time = Duration::ZERO;
     for fen in BENCH_POSITIONS {
