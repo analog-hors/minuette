@@ -9,12 +9,16 @@ enum MoveScore {
     Capture(i32),
 }
 
-pub fn get_ordered_moves(board: &Board) -> MoveList {
+pub fn get_ordered_moves(board: &Board, qsearch: bool) -> MoveList {
     let mut movelist = MoveList::new();
     board.generate_moves(|packed_moves| {
         movelist.extend(packed_moves);
         false
     });
+
+    if qsearch {
+        movelist.retain(|&mut mv| captured_piece(mv, board).is_some());
+    }
 
     let key_fn = |mv| {
         if let Some(victim) = captured_piece(mv, board) {

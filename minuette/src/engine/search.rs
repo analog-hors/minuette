@@ -13,13 +13,13 @@ pub enum SearchLimits {
         increment: Duration,
     },
     PerMove {
-        depth: u8,
+        depth: u16,
     },
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct SearchInfo {
-    pub depth: u8,
+    pub depth: u16,
     pub nodes: u64,
     pub eval: i16,
     pub time: Duration,
@@ -30,7 +30,7 @@ pub struct Search {
     search_start: Instant,
     soft_limit: Duration,
     hard_limit: Duration,
-    max_depth: u8,
+    max_depth: u16,
     best_move: Option<Move>,
     nodes: u64,
 }
@@ -39,7 +39,7 @@ impl Search {
     pub fn new(limits: SearchLimits) -> Self {
         let mut soft_limit = Duration::MAX;
         let mut hard_limit = Duration::MAX;
-        let mut max_depth = u8::MAX;
+        let mut max_depth = u16::MAX;
         match limits {
             SearchLimits::PerGame { clock, .. } => {
                 soft_limit = clock / 40;
@@ -81,17 +81,20 @@ impl Search {
         }
     }
 
-    fn negamax(&mut self, board: &mut BoardStack, mut alpha: i16, beta: i16, depth: u8, ply: u8) -> Option<i16> {
+    fn negamax(&mut self, board: &mut BoardStack, mut alpha: i16, beta: i16, depth: u16, ply: u16) -> Option<i16> {
         assert!(alpha < beta);
+
+        if depth == 0 {
+            if board.repetitions() >= 3 {
+                return Some(0);
+            }
+            return Some(self.qsearch(board, alpha, beta, ply));
+        }
 
         self.nodes += 1;
 
         if self.nodes % 1024 == 0 && self.best_move.is_some() && self.search_start.elapsed() >= self.hard_limit {
             return None;
-        }
-
-        if depth == 0 {
-            return Some(evaluate(board.get()));
         }
 
         match board.get().status() {
@@ -106,7 +109,7 @@ impl Search {
 
         let mut best_move = None;
         let mut best_score = -INFINITY;
-        for mv in get_ordered_moves(board.get()) {
+        for mv in get_ordered_moves(board.get(), false) {
             board.play_unchecked(mv);
             let child_score = -self.negamax(board, -beta, -alpha, depth - 1, ply + 1)?;
             board.undo();
@@ -128,5 +131,40 @@ impl Search {
         }
 
         Some(best_score)
+    }
+
+    fn qsearch(&mut self, board: &mut BoardStack, mut alpha: i16, beta: i16, ply: u16) -> i16 {
+        assert!(alpha < beta);
+
+        self.nodes += 1;
+
+        match board.get().status() {
+            GameStatus::Won => return -CHECKMATE + ply as i16,
+            GameStatus::Drawn => return 0,
+            GameStatus::Ongoing => {},
+        }
+
+        let mut best_score = evaluate(board.get());
+        alpha = alpha.max(best_score);
+        if alpha >= beta {
+            return best_score;
+        }
+
+        for mv in get_ordered_moves(board.get(), true) {
+            board.play_unchecked(mv);
+            let child_score = -self.qsearch(board, -beta, -alpha, ply + 1);
+            board.undo();
+
+            if child_score > best_score {
+                best_score = child_score;
+                alpha = alpha.max(child_score);
+            }
+
+            if alpha >= beta {
+                break;
+            }
+        }
+
+        best_score
     }
 }
