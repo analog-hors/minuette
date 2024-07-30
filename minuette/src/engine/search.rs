@@ -5,7 +5,7 @@ use cozy_chess::{Board, Move, GameStatus};
 use super::board_stack::BoardStack;
 use super::movelist::get_ordered_moves;
 use super::eval::{evaluate, CHECKMATE, INFINITY};
-use super::tt::{TranspositionTable, TtEntry};
+use super::tt::{TranspositionTable, TtEntry, TtBound};
 
 #[derive(Debug, Clone, Copy)]
 pub enum SearchLimits {
@@ -14,13 +14,13 @@ pub enum SearchLimits {
         increment: Duration,
     },
     PerMove {
-        depth: u16,
+        depth: u8,
     },
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct SearchInfo {
-    pub depth: u16,
+    pub depth: u8,
     pub nodes: u64,
     pub eval: i16,
     pub time: Duration,
@@ -32,7 +32,7 @@ pub struct Search<'s> {
     search_start: Instant,
     soft_limit: Duration,
     hard_limit: Duration,
-    max_depth: u16,
+    max_depth: u8,
     best_move: Option<Move>,
     nodes: u64,
 }
@@ -41,7 +41,7 @@ impl<'s> Search<'s> {
     pub fn new(tt: &'s mut TranspositionTable, limits: SearchLimits) -> Self {
         let mut soft_limit = Duration::MAX;
         let mut hard_limit = Duration::MAX;
-        let mut max_depth = u16::MAX;
+        let mut max_depth = u8::MAX;
         match limits {
             SearchLimits::PerGame { clock, .. } => {
                 soft_limit = clock / 40;
@@ -84,7 +84,7 @@ impl<'s> Search<'s> {
         }
     }
 
-    fn negamax(&mut self, board: &mut BoardStack, mut alpha: i16, beta: i16, depth: u16, ply: u16) -> Option<i16> {
+    fn negamax(&mut self, board: &mut BoardStack, mut alpha: i16, beta: i16, depth: u8, ply: u16) -> Option<i16> {
         assert!(alpha < beta);
 
         if depth == 0 {
@@ -110,7 +110,18 @@ impl<'s> Search<'s> {
             return Some(0);
         }
 
+        let init_alpha = alpha;
         let tt_entry = self.tt.load(board.get().hash());
+        if let Some(tt_entry) = tt_entry {
+            let should_cutoff = ply > 0 && tt_entry.depth >= depth && match tt_entry.bound {
+                TtBound::Exact => true,
+                TtBound::Lower => tt_entry.score >= beta,
+                TtBound::Upper => tt_entry.score <= alpha,
+            };
+            if should_cutoff {
+                return Some(tt_entry.score);
+            }
+        }
 
         let mut best_move = None;
         let mut best_score = -INFINITY;
@@ -135,8 +146,16 @@ impl<'s> Search<'s> {
             self.best_move = Some(best_move);
         }
 
+        // TODO mate correction
         self.tt.store(board.get().hash(), TtEntry {
             best_move,
+            depth,
+            score: best_score,
+            bound: match () {
+                _ if alpha >= beta => TtBound::Lower,
+                _ if alpha > init_alpha => TtBound::Exact,
+                _ => TtBound::Upper,
+            }
         });
         Some(best_score)
     }

@@ -1,8 +1,18 @@
 use cozy_chess::Move;
 
 #[derive(Debug, Clone, Copy)]
+pub enum TtBound {
+    Upper,
+    Exact,
+    Lower,
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct TtEntry {
     pub best_move: Move,
+    pub depth: u8,
+    pub score: i16,
+    pub bound: TtBound,
 }
 
 type FullTtEntry = Option<(u64, TtEntry)>;
