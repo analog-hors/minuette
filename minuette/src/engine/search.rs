@@ -6,6 +6,8 @@ use super::board_stack::BoardStack;
 use super::movelist::get_ordered_moves;
 use super::eval::{evaluate, CHECKMATE, INFINITY};
 use super::tt::{TranspositionTable, TtEntry, TtBound};
+use super::history_tables::HistoryTables;
+use super::helpers::move_is_capture;
 
 #[derive(Debug, Clone, Copy)]
 pub enum SearchLimits {
@@ -29,6 +31,7 @@ pub struct SearchInfo {
 
 pub struct Search<'s> {
     tt: &'s mut TranspositionTable,
+    history: &'s mut HistoryTables,
     search_start: Instant,
     soft_limit: Duration,
     hard_limit: Duration,
@@ -38,7 +41,7 @@ pub struct Search<'s> {
 }
 
 impl<'s> Search<'s> {
-    pub fn new(tt: &'s mut TranspositionTable, limits: SearchLimits) -> Self {
+    pub fn new(tt: &'s mut TranspositionTable, history: &'s mut HistoryTables, limits: SearchLimits) -> Self {
         let mut soft_limit = Duration::MAX;
         let mut hard_limit = Duration::MAX;
         let mut max_depth = u8::MAX;
@@ -55,6 +58,7 @@ impl<'s> Search<'s> {
 
         Self {
             tt,
+            history,
             search_start: Instant::now(),
             soft_limit,
             hard_limit,
@@ -141,8 +145,8 @@ impl<'s> Search<'s> {
 
         let mut best_move = None;
         let mut best_score = -INFINITY;
-        let movelist = get_ordered_moves(board.get(), false, tt_entry);
-        for (i, mv) in movelist.into_iter().enumerate() {
+        let movelist = get_ordered_moves(board.get(), tt_entry, self.history, false);
+        for (i, &mv) in movelist.iter().enumerate() {
             let mut score = -INFINITY;
 
             board.play_unchecked(mv);
@@ -161,6 +165,16 @@ impl<'s> Search<'s> {
             }
 
             if score >= beta {
+                if !move_is_capture(board.get(), mv) {
+                    let change = depth as i32 * depth as i32;
+                    for &mv in &movelist[..i] {
+                        if !move_is_capture(board.get(), mv) {
+                            self.history.update_move(board.get(), mv, -change);
+                        }
+                    }
+                    self.history.update_move(board.get(), mv, change);
+                }
+
                 break;
             }
         }
@@ -205,7 +219,7 @@ impl<'s> Search<'s> {
             return best_score;
         }
 
-        for mv in get_ordered_moves(board.get(), true, tt_entry) {
+        for mv in get_ordered_moves(board.get(), tt_entry, self.history, true) {
             board.play_unchecked(mv);
             let child_score = -self.qsearch(board, -beta, -alpha, ply + 1);
             board.undo();

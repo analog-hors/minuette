@@ -1,16 +1,19 @@
 use cozy_chess::{Board, Move};
 
 use super::tt::TranspositionTable;
-use super::search::{Search, SearchLimits, SearchInfo};
+use super::search::{Search, SearchInfo, SearchLimits};
+use super::history_tables::HistoryTables;
 
 pub struct Engine {
     tt: TranspositionTable,
+    history: HistoryTables,
 }
 
 impl Engine {
     pub fn new(tt_bytes: usize) -> Self {
         Self {
             tt: TranspositionTable::new(tt_bytes),
+            history: HistoryTables::new(),
         }
     }
 
@@ -20,6 +23,7 @@ impl Engine {
 
     pub fn reset(&mut self) {
         self.tt.clear();
+        self.history = HistoryTables::new();
     }
 
     pub fn think(
@@ -29,7 +33,7 @@ impl Engine {
         limits: SearchLimits,
         on_iter: &mut dyn FnMut(SearchInfo),
     ) {
-        let search = Search::new(&mut self.tt, limits);
+        let search = Search::new(&mut self.tt, &mut self.history, limits);
         search.start(init_pos, moves_played, on_iter);
     }
 }

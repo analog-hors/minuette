@@ -1,18 +1,20 @@
 use arrayvec::ArrayVec;
-use cozy_chess::{Board, Rank, Square, Piece, Move};
+use cozy_chess::{Board, Move};
 
 use super::tt::TtEntry;
+use super::history_tables::HistoryTables;
+use super::helpers::{move_is_capture, captured_piece};
 
 type MoveList = ArrayVec<Move, 218>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum MoveScore {
-    Quiet,
+    Quiet(i32),
     Capture(i32),
     PvMove,
 }
 
-pub fn get_ordered_moves(board: &Board, qsearch: bool, tt_entry: Option<TtEntry>) -> MoveList {
+pub fn get_ordered_moves(board: &Board, tt_entry: Option<TtEntry>, history: &HistoryTables, qsearch: bool) -> MoveList {
     let mut movelist = MoveList::new();
     board.generate_moves(|packed_moves| {
         movelist.extend(packed_moves);
@@ -20,7 +22,7 @@ pub fn get_ordered_moves(board: &Board, qsearch: bool, tt_entry: Option<TtEntry>
     });
 
     if qsearch {
-        movelist.retain(|&mut mv| captured_piece(mv, board).is_some());
+        movelist.retain(|&mut mv| move_is_capture(board, mv));
     }
 
     let key_fn = |mv| {
@@ -28,32 +30,14 @@ pub fn get_ordered_moves(board: &Board, qsearch: bool, tt_entry: Option<TtEntry>
             return MoveScore::PvMove;
         }
 
-        if let Some(victim) = captured_piece(mv, board) {
+        if let Some(victim) = captured_piece(board, mv) {
             let attacker = board.piece_on(mv.from).expect("missing attacker?");
             return MoveScore::Capture(victim as i32 * 8 - attacker as i32);
         }
 
-        MoveScore::Quiet
+        MoveScore::Quiet(history.get_quiet_score(board, mv))
     };
     movelist.sort_by_key(|&mv| std::cmp::Reverse(key_fn(mv)));
 
     movelist
-}
-
-fn captured_piece(mv: Move, board: &Board) -> Option<Piece> {
-    let enemy_pieces = board.colors(!board.side_to_move());
-    if enemy_pieces.has(mv.to) {
-        return board.piece_on(mv.to);
-    }
-
-    let is_pawn_move = board.pieces(Piece::Pawn).has(mv.from);
-    let ep_square = board.en_passant().map(|file| {
-        let rank = Rank::Sixth.relative_to(board.side_to_move());
-        Square::new(file, rank)
-    });
-    if is_pawn_move && Some(mv.to) == ep_square {
-        return Some(Piece::Pawn);
-    }
-
-    None
 }
