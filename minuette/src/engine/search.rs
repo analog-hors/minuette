@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use cozy_chess::{Board, Move, GameStatus};
+use cozy_chess::{Board, Piece, Move, GameStatus};
 
 use super::board_stack::BoardStack;
 use super::movelist::get_ordered_moves;
@@ -126,28 +126,41 @@ impl<'s> Search<'s> {
             }
         }
 
+        let kings = board.get().pieces(Piece::King);
+        let pawns = board.get().pieces(Piece::Pawn);
+        let only_pawns = board.get().occupied() == kings | pawns;
+        if !is_pv && !only_pawns && depth >= 4 && board.null_move() {
+            let next_depth = (depth - 1).saturating_sub(2);
+            let score = -self.negamax(board, -beta, -beta + 1, next_depth, ply + 1)?;
+            board.undo();
+
+            if score >= beta {
+                return Some(score);
+            }
+        }
+
         let mut best_move = None;
         let mut best_score = -INFINITY;
         let movelist = get_ordered_moves(board.get(), false, tt_entry);
         for (i, mv) in movelist.into_iter().enumerate() {
-            let mut child_score = -INFINITY;
+            let mut score = -INFINITY;
 
             board.play_unchecked(mv);
             if i != 0 {
-                child_score = -self.negamax(board, -alpha - 1, -alpha, depth - 1, ply + 1)?;
+                score = -self.negamax(board, -alpha - 1, -alpha, depth - 1, ply + 1)?;
             }
-            if i == 0 || child_score > alpha && child_score < beta {
-                child_score = -self.negamax(board, -beta, -alpha, depth - 1, ply + 1)?;
+            if i == 0 || score > alpha && score < beta {
+                score = -self.negamax(board, -beta, -alpha, depth - 1, ply + 1)?;
             }
             board.undo();
 
-            if child_score > best_score {
+            if score > best_score {
                 best_move = Some(mv);
-                best_score = child_score;
-                alpha = alpha.max(child_score);
+                best_score = score;
+                alpha = alpha.max(score);
             }
 
-            if child_score >= beta {
+            if score >= beta {
                 break;
             }
         }

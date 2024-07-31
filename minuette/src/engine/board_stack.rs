@@ -33,6 +33,15 @@ impl BoardStack {
         self.stack.push(next);
     }
 
+    pub fn null_move(&mut self) -> bool {
+        let Some(next) = self.get().null_move() else {
+            return false;
+        };
+        self.history.push(next.hash());
+        self.stack.push(next);
+        true
+    }
+
     pub fn undo(&mut self) {
         self.history.pop();
         self.stack.pop();
