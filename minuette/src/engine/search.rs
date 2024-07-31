@@ -85,6 +85,8 @@ impl<'s> Search<'s> {
     }
 
     fn negamax(&mut self, board: &mut BoardStack, mut alpha: i16, beta: i16, depth: u8, ply: u16) -> Option<i16> {
+        assert!((-INFINITY..=INFINITY).contains(&alpha));
+        assert!((-INFINITY..=INFINITY).contains(&beta));
         assert!(alpha < beta);
 
         if depth == 0 {
@@ -105,15 +107,15 @@ impl<'s> Search<'s> {
             GameStatus::Drawn => return Some(0),
             GameStatus::Ongoing => {},
         }
-
         if board.repetitions() >= 3 {
             return Some(0);
         }
 
+        let is_pv = alpha + 1 != beta;
         let init_alpha = alpha;
         let tt_entry = self.tt.load(board.get().hash());
         if let Some(tt_entry) = tt_entry {
-            let should_cutoff = ply > 0 && tt_entry.depth >= depth && match tt_entry.bound {
+            let should_cutoff = !is_pv && tt_entry.depth >= depth && match tt_entry.bound {
                 TtBound::Exact => true,
                 TtBound::Lower => tt_entry.score >= beta,
                 TtBound::Upper => tt_entry.score <= alpha,
@@ -125,9 +127,17 @@ impl<'s> Search<'s> {
 
         let mut best_move = None;
         let mut best_score = -INFINITY;
-        for mv in get_ordered_moves(board.get(), false, tt_entry) {
+        let movelist = get_ordered_moves(board.get(), false, tt_entry);
+        for (i, mv) in movelist.into_iter().enumerate() {
+            let mut child_score = -INFINITY;
+
             board.play_unchecked(mv);
-            let child_score = -self.negamax(board, -beta, -alpha, depth - 1, ply + 1)?;
+            if i != 0 {
+                child_score = -self.negamax(board, -alpha - 1, -alpha, depth - 1, ply + 1)?;
+            }
+            if i == 0 || child_score > alpha && child_score < beta {
+                child_score = -self.negamax(board, -beta, -alpha, depth - 1, ply + 1)?;
+            }
             board.undo();
 
             if child_score > best_score {
@@ -136,7 +146,7 @@ impl<'s> Search<'s> {
                 alpha = alpha.max(child_score);
             }
 
-            if alpha >= beta {
+            if child_score >= beta {
                 break;
             }
         }
@@ -161,6 +171,8 @@ impl<'s> Search<'s> {
     }
 
     fn qsearch(&mut self, board: &mut BoardStack, mut alpha: i16, beta: i16, ply: u16) -> i16 {
+        assert!((-INFINITY..=INFINITY).contains(&alpha));
+        assert!((-INFINITY..=INFINITY).contains(&beta));
         assert!(alpha < beta);
 
         self.nodes += 1;
@@ -175,7 +187,7 @@ impl<'s> Search<'s> {
 
         let mut best_score = evaluate(board.get());
         alpha = alpha.max(best_score);
-        if alpha >= beta {
+        if best_score >= beta {
             return best_score;
         }
 
@@ -189,7 +201,7 @@ impl<'s> Search<'s> {
                 alpha = alpha.max(child_score);
             }
 
-            if alpha >= beta {
+            if child_score >= beta {
                 break;
             }
         }
