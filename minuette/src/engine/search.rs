@@ -43,9 +43,10 @@ impl<'s> Search<'s> {
         let mut hard_limit = Duration::MAX;
         let mut max_depth = u8::MAX;
         match limits {
-            SearchLimits::PerGame { clock, .. } => {
+            SearchLimits::PerGame { clock, increment } => {
                 soft_limit = clock / 40;
                 hard_limit = clock / 4;
+                let _ = increment; // pretend we account for increment
             }
             SearchLimits::PerMove { depth } => {
                 max_depth = depth;
