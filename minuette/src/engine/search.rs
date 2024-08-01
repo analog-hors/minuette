@@ -89,10 +89,14 @@ impl<'s> Search<'s> {
         }
     }
 
-    fn negamax(&mut self, board: &mut BoardStack, mut alpha: i16, beta: i16, depth: i32, ply: u16) -> Option<i16> {
+    fn negamax(&mut self, board: &mut BoardStack, mut alpha: i16, beta: i16, mut depth: i32, ply: u16) -> Option<i16> {
         assert!((-INFINITY..=INFINITY).contains(&alpha));
         assert!((-INFINITY..=INFINITY).contains(&beta));
         assert!(alpha < beta);
+
+        if !board.get().checkers().is_empty() {
+            depth = depth.max(0) + 1;
+        }
 
         if depth <= 0 {
             if board.repetitions() >= 3 {
