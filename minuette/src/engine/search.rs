@@ -129,7 +129,7 @@ impl<'s> Search<'s> {
         let kings = board.get().pieces(Piece::King);
         let pawns = board.get().pieces(Piece::Pawn);
         let only_pawns = board.get().occupied() == kings | pawns;
-        if !is_pv && !only_pawns && depth >= 4 && board.null_move() {
+        if !is_pv && !only_pawns && depth >= 2 && board.null_move() {
             let next_depth = (depth - 1).saturating_sub(2);
             let score = -self.negamax(board, -beta, -beta + 1, next_depth, ply + 1)?;
             board.undo();
