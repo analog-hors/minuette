@@ -146,15 +146,27 @@ impl<'s> Search<'s> {
         let mut best_score = -INFINITY;
         let movelist = get_ordered_moves(board.get(), tt_entry, self.history, false);
         for (i, &mv) in movelist.iter().enumerate() {
-            let mut score = -INFINITY;
+            let is_capture = move_is_capture(board.get(), mv);
+            let mut reduction = (i >= 4) as i32;
+            if is_capture {
+                reduction = 0;
+            }
 
+            let mut score = -INFINITY;
             board.play_unchecked(mv);
+
             if i != 0 {
+                score = -self.negamax(board, -alpha - 1, -alpha, depth - 1 - reduction, ply + 1)?;
+            }
+            
+            if i != 0 && reduction != 0 && score > alpha {
                 score = -self.negamax(board, -alpha - 1, -alpha, depth - 1, ply + 1)?;
             }
-            if i == 0 || score > alpha && score < beta {
+            
+            if i == 0 || score > alpha {
                 score = -self.negamax(board, -beta, -alpha, depth - 1, ply + 1)?;
             }
+
             board.undo();
 
             if score > best_score {
@@ -164,7 +176,7 @@ impl<'s> Search<'s> {
             }
 
             if score >= beta {
-                if !move_is_capture(board.get(), mv) {
+                if !is_capture {
                     let change = depth as i32 * depth as i32;
                     for &mv in &movelist[..i] {
                         if !move_is_capture(board.get(), mv) {
