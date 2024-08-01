@@ -130,11 +130,13 @@ impl<'s> Search<'s> {
             }
         }
 
+        let static_eval = evaluate(board.get());
         let kings = board.get().pieces(Piece::King);
         let pawns = board.get().pieces(Piece::Pawn);
         let only_pawns = board.get().occupied() == kings | pawns;
-        if !is_pv && !only_pawns && depth >= 2 && board.null_move() {
-            let score = -self.negamax(board, -beta, -beta + 1, depth - 1 - 2, ply + 1)?;
+        if !is_pv && !only_pawns && depth >= 2 && static_eval >= beta && board.null_move() {
+            let reduction = 2 + (static_eval as i32 - beta as i32) / 200;
+            let score = -self.negamax(board, -beta, -beta + 1, depth - 1 - reduction, ply + 1)?;
             board.undo();
 
             if score >= beta {
