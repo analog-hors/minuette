@@ -71,7 +71,7 @@ impl<'s> Search<'s> {
     pub fn start(mut self, init_pos: &Board, moves_played: &[Move], on_iter: &mut dyn FnMut(SearchInfo)) {
         let mut board = BoardStack::new(init_pos, moves_played);
         for target_depth in 1..=self.max_depth {
-            let Some(eval) = self.negamax(&mut board, -INFINITY, INFINITY, target_depth, 0) else {
+            let Some(eval) = self.negamax(&mut board, -INFINITY, INFINITY, target_depth as i32, 0) else {
                 break;
             };
 
@@ -89,12 +89,12 @@ impl<'s> Search<'s> {
         }
     }
 
-    fn negamax(&mut self, board: &mut BoardStack, mut alpha: i16, beta: i16, depth: u8, ply: u16) -> Option<i16> {
+    fn negamax(&mut self, board: &mut BoardStack, mut alpha: i16, beta: i16, depth: i32, ply: u16) -> Option<i16> {
         assert!((-INFINITY..=INFINITY).contains(&alpha));
         assert!((-INFINITY..=INFINITY).contains(&beta));
         assert!(alpha < beta);
 
-        if depth == 0 {
+        if depth <= 0 {
             if board.repetitions() >= 3 {
                 return Some(0);
             }
@@ -120,7 +120,7 @@ impl<'s> Search<'s> {
         let init_alpha = alpha;
         let tt_entry = self.tt.load(board.get().hash());
         if let Some(tt_entry) = tt_entry {
-            let should_cutoff = !is_pv && tt_entry.depth >= depth && match tt_entry.bound {
+            let should_cutoff = !is_pv && tt_entry.depth as i32 >= depth && match tt_entry.bound {
                 TtBound::Exact => true,
                 TtBound::Lower => tt_entry.score >= beta,
                 TtBound::Upper => tt_entry.score <= alpha,
@@ -134,8 +134,7 @@ impl<'s> Search<'s> {
         let pawns = board.get().pieces(Piece::Pawn);
         let only_pawns = board.get().occupied() == kings | pawns;
         if !is_pv && !only_pawns && depth >= 2 && board.null_move() {
-            let next_depth = (depth - 1).saturating_sub(2);
-            let score = -self.negamax(board, -beta, -beta + 1, next_depth, ply + 1)?;
+            let score = -self.negamax(board, -beta, -beta + 1, depth - 1 - 2, ply + 1)?;
             board.undo();
 
             if score >= beta {
@@ -187,7 +186,7 @@ impl<'s> Search<'s> {
         // TODO mate correction
         self.tt.store(board.get().hash(), TtEntry {
             best_move,
-            depth,
+            depth: depth.clamp(0, u8::MAX as i32) as u8,
             score: best_score,
             bound: match () {
                 _ if alpha >= beta => TtBound::Lower,
