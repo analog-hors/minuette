@@ -156,6 +156,18 @@ impl<'s> Search<'s> {
             }
         }
 
+        let mut quiets_to_check = if !is_pv {
+            match depth {
+                1 => 10,
+                2 => 13,
+                3 => 16,
+                4 => 19,
+                _ => i32::MAX,
+            }
+        } else {
+            i32::MAX
+        };
+
         let mut best_move = None;
         let mut best_score = -INFINITY;
         let movelist = get_ordered_moves(board.get(), tt_entry, self.history, false);
@@ -164,6 +176,13 @@ impl<'s> Search<'s> {
             let mut reduction = (i as i32 * 15 + depth * 20) / 100;
             if is_capture {
                 reduction = 0;
+            }
+
+            if i != 0 && !is_capture {
+                if quiets_to_check == 0 {
+                    break;
+                }
+                quiets_to_check -= 1;
             }
 
             let mut score = -INFINITY;
