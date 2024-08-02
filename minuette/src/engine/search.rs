@@ -211,7 +211,10 @@ impl<'s> Search<'s> {
 
         // TODO mate correction
         self.tt.store(board.get().hash(), TtEntry {
-            best_move,
+            best_move: match alpha > init_alpha {
+                true => Some(best_move),
+                false => tt_entry.and_then(|entry| entry.best_move),
+            },
             depth: depth.clamp(0, u8::MAX as i32) as u8,
             score: best_score,
             bound: match () {

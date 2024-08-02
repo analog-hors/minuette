@@ -26,7 +26,7 @@ pub fn get_ordered_moves(board: &Board, tt_entry: Option<TtEntry>, history: &His
     }
 
     let key_fn = |mv| {
-        if Some(mv) == tt_entry.map(|entry| entry.best_move) {
+        if Some(mv) == tt_entry.and_then(|entry| entry.best_move) {
             return MoveScore::PvMove;
         }
 

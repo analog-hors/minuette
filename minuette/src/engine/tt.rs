@@ -9,7 +9,7 @@ pub enum TtBound {
 
 #[derive(Debug, Clone, Copy)]
 pub struct TtEntry {
-    pub best_move: Move,
+    pub best_move: Option<Move>,
     pub depth: u8,
     pub score: i16,
     pub bound: TtBound,
