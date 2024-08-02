@@ -17,6 +17,8 @@ pub struct TtEntry {
 
 type FullTtEntry = Option<(u64, TtEntry)>;
 
+const _ASSERT_TT_ENTRY_SIZE: () = assert!(std::mem::size_of::<FullTtEntry>() == 16);
+
 pub struct TranspositionTable {
     table: Vec<FullTtEntry>,
 }
