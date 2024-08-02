@@ -135,6 +135,14 @@ impl<'s> Search<'s> {
         }
 
         let static_eval = evaluate(board.get());
+        
+        if !is_pv && depth <= 4 {
+            let rfp_margin = depth as i16 * 80;
+            if static_eval - rfp_margin >= beta {
+                return Some(static_eval - rfp_margin);
+            }
+        }
+
         let kings = board.get().pieces(Piece::King);
         let pawns = board.get().pieces(Piece::Pawn);
         let only_pawns = board.get().occupied() == kings | pawns;
