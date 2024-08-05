@@ -173,7 +173,7 @@ impl<'s> Search<'s> {
         let movelist = get_ordered_moves(board.get(), tt_entry, self.history, false);
         for (i, &mv) in movelist.iter().enumerate() {
             let is_capture = move_is_capture(board.get(), mv);
-            let mut reduction = (i as i32 * 15 + depth * 20) / 100;
+            let mut reduction = (i as i32 * 10 + depth * 15) / 100;
             if is_capture {
                 reduction = 0;
             }
