@@ -174,7 +174,8 @@ impl<'s> Search<'s> {
         for (i, &mv) in movelist.iter().enumerate() {
             let is_capture = move_is_capture(board.get(), mv);
             let mut reduction = (i as i32 * 10 + depth * 15) / 100;
-            if is_capture {
+            reduction -= self.history.get_quiet_score(board.get(), mv) / 200;
+            if reduction < 0 || is_capture {
                 reduction = 0;
             }
 
